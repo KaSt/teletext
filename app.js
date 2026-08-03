@@ -13,17 +13,18 @@ const MAX_PAGE = 899;
 let currentPage = HOME;
 let inputBuffer = '';
 let requestToken = 0;
+let audioContext = null;
+let humNodes = null;
 
 const colours = {
   W: '#ffffff', Y: '#ffff00', C: '#00ffff', G: '#00ff00',
-  R: '#ff0000', B: '#5080ff', M: '#ff00ff'
+  R: '#ff0000', B: '#0048ff', M: '#ff00ff', K: '#000000'
 };
 
 const esc = value => String(value)
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
   .replaceAll('>', '&gt;');
-
 const pad = (text = '', width = WIDTH) => String(text).slice(0, width).padEnd(width, ' ');
 const center = (text = '', width = WIDTH) => {
   const value = String(text).slice(0, width);
@@ -32,6 +33,9 @@ const center = (text = '', width = WIDTH) => {
 };
 const line = (text = '', colour = 'W', bg = '') => ({ text: pad(text), colour, bg });
 const blank = () => line('');
+const rule = colour => line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', colour);
+const choice = (random, values) => values[Math.floor(random() * values.length)];
+const integer = (random, min, max) => min + Math.floor(random() * (max - min + 1));
 
 function normalise(lines) {
   const result = lines.slice(0, HEIGHT);
@@ -71,204 +75,440 @@ function dailyRandom(pageNumber, salt = '') {
   return mulberry32(hashString(`${key}:${pageNumber}:${salt}`));
 }
 
-const choice = (random, values) => values[Math.floor(random() * values.length)];
-
 function heading(page, title, colour = 'Y') {
   return [
-    line(`TELEVIDEO ${String(page).padStart(3, '0')} ${title}`.padEnd(WIDTH), colour),
-    line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', colour)
+    line(`KAI TELEVIDEO ${String(page).padStart(3, '0')} ${title}`, colour),
+    rule(colour)
   ];
 }
 
 function footer(left = '100 INDICE', right = '') {
   return [
-    line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'B'),
+    rule('B'),
     line(`${left}${right ? right.padStart(WIDTH - left.length) : ''}`, 'C')
   ];
+}
+
+function dateLabel() {
+  return new Intl.DateTimeFormat('it-IT', {
+    weekday: 'short', day: '2-digit', month: 'short'
+  }).format(new Date()).replaceAll('.', '').toUpperCase();
 }
 
 const pages = new Map();
 
 pages.set(100, () => normalise([
-  line('      TELEVIDEO - INDICE GENERALE      ', 'Y', 'B'),
-  line('        RAI  SERVIZIO TELEVIDEO        ', 'W'),
-  line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'Y'),
-  line('101  ULTIM\'ORA', 'Y'),
-  line('102  NOTIZIE DEL GIORNO', 'W'),
+  line('       KAI TELEVIDEO - PAGINA 100      ', 'Y', 'B'),
+  line(`          ${dateLabel().padEnd(16)} INDICE`, 'W'),
+  rule('Y'),
+  line("101  ULTIM'ORA", 'Y'),
+  line('102  NOTIZIE', 'W'),
   line('103  PRIMA PAGINA', 'W'),
-  line('104  OGGI', 'W'),
-  blank(),
-  line('110  PRIMO PIANO', 'W'),
-  line('120  POLITICA', 'W'),
-  line('130  ECONOMIA', 'W'),
-  line('140  DALL\'ITALIA', 'W'),
+  line('110  POLITICA E PARLAMENTO', 'W'),
+  line('130  ECONOMIA E LAVORO', 'W'),
+  line("140  DALL'ITALIA", 'W'),
   line('150  DAL MONDO', 'W'),
-  line('160  CULTURA E SPETTACOLO', 'W'),
+  line('160  SPETTACOLO E CULTURA', 'W'),
   line('200  SPORT', 'G'),
   line('300  BORSA E FINANZA', 'G'),
-  line('400  PUBBLICA UTILITA\'', 'C'),
+  line("400  PUBBLICA UTILITA'", 'C'),
+  line('450  PREVISIONI DEL TEMPO', 'C'),
   line('500  PROGRAMMI TV E RADIO', 'C'),
-  line('600  GIOCHI - LOTTO', 'M'),
-  line('700  SERVIZI E PAGINE NASCOSTE', 'M'),
-  line('800  OGGI IN ITALIA', 'Y'),
+  line('600  GIOCHI - LOTTO - OROSCOPO', 'M'),
+  line('700  SCIENZA - COMPUTER - SERVIZI', 'M'),
+  line('800  ALMANACCO E TEMPO LIBERO', 'Y'),
   line('899  INFORMAZIONI SUL SERVIZIO', 'C'),
-  line('  DIGITARE IL NUMERO DELLA PAGINA  ', 'W', 'B'),
-  line('     alcune pagine non sono in indice', 'G')
+  blank(),
+  line('      DIGITARE IL NUMERO DI PAGINA    ', 'W', 'B'),
+  line('    C=EFFETTO VIDEO   M=RONZIO TV', 'G')
 ]));
 
 pages.set(101, () => {
-  const random = dailyRandom(101, 'ultima');
+  const r = dailyRandom(101, 'ultima');
   const headlines = [
-    'CALDO: TEMPERATURE ANCORA ELEVATE',
-    'TRAFFICO INTENSO SULLE AUTOSTRADE',
-    'NUOVO ACCORDO AL TERMINE DEL VERTICE',
-    'TRENI: RITARDI CONTENUTI NELLA SERA'
+    ['ROMA, TERMINATO IL VERTICE', 'Comunicato atteso in tarda serata.'],
+    ['TRAFFICO INTENSO VERSO LE CITTA\'', 'Rallentamenti sulle principali arterie.'],
+    ['CALDO, NUOVO AUMENTO DELLE MASSIME', 'Temporali isolati sui rilievi alpini.'],
+    ['TRENI, CIRCOLAZIONE REGOLARE', 'Lievi ritardi su alcune linee locali.']
   ];
+  const item = choice(r, headlines);
   return normalise([
     ...heading(101, "ULTIM'ORA", 'Y'),
-    line('ULTIM\'ORA', 'W', 'R'),
+    line(" ULTIM'ORA ", 'W', 'R'),
     blank(),
-    line(choice(random, headlines), 'Y'),
-    line('Aggiornamenti nelle prossime pagine.', 'W'),
+    line(item[0], 'Y'),
+    line(item[1], 'W'),
     blank(),
-    line('Le informazioni sono simulate e create', 'C'),
-    line('localmente nel browser del visitatore.', 'C'),
+    line('Aggiornamento ore ' + new Date().toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'}), 'C'),
+    line('Ulteriori notizie nelle prossime pagine.', 'C'),
     blank(),
-    line('Questa pagina cambia nel corso dei giorni.', 'G'),
-    blank(),
+    line('102 NOTIZIE DEL GIORNO', 'G'),
+    line('103 PRIMA PAGINA', 'G'),
     ...footer('100 INDICE', '102 NOTIZIE')
   ]);
 });
 
 pages.set(102, () => normalise([
-  ...heading(102, 'NOTIZIE DEL GIORNO', 'Y'),
-  line('110  PRIMO PIANO', 'W'),
-  line('120  POLITICA ITALIANA', 'W'),
+  ...heading(102, 'NOTIZIE', 'Y'),
+  line('110  POLITICA E PARLAMENTO', 'W'),
+  line('120  PARTITI E ISTITUZIONI', 'W'),
   line('130  ECONOMIA E LAVORO', 'W'),
-  line('140  CRONACHE ITALIANE', 'W'),
+  line("140  CRONACHE DALL'ITALIA", 'W'),
   line('150  NOTIZIE DAL MONDO', 'W'),
-  line('160  CULTURA E SPETTACOLO', 'W'),
-  line('170  SOCIETA\' E CITTADINI', 'W'),
-  line('180  DOSSIER E SPECIALI', 'W'),
+  line('160  SPETTACOLO E CULTURA', 'W'),
+  line("170  SOCIETA' E COSTUME", 'W'),
+  line('180  SCIENZA E MEDICINA', 'W'),
   blank(),
   line('200  SPORT', 'G'),
   line('300  BORSA E FINANZA', 'G'),
-  ...footer('101 ULTIM\'ORA', '100 INDICE')
+  ...footer("101 ULTIM'ORA", '100 INDICE')
 ]));
 
-pages.set(103, () => normalise([
-  ...heading(103, 'PRIMA PAGINA', 'Y'),
-  line('IL GRAN CALDO NON CONCEDE TREGUA', 'Y'),
-  line('Pomeriggio difficile nelle grandi citta\'.', 'W'),
-  line('Previsioni e temperature a pagina 300.', 'C'),
-  blank(),
-  line('TRASPORTI, GIORNATA SENZA EMERGENZE', 'Y'),
-  line('Qualche rallentamento nelle ore di punta.', 'W'),
-  blank(),
-  line('ARCHIVI: RITROVATA UNA VECCHIA BOBINA', 'Y'),
-  line('Conteneva immagini prive di datazione.', 'W'),
-  blank(),
-  ...footer('100 INDICE', '104 OGGI')
-]));
-
-pages.set(200, () => normalise([
-  ...heading(200, 'SPORT', 'G'),
-  line('CALCIO', 'W', 'G'),
-  line('201  NOTIZIE E RISULTATI', 'W'),
-  line('205  CAMPIONATO', 'W'),
-  line('210  COPPE EUROPEE', 'W'),
-  blank(),
-  line('ALTRI SPORT', 'W', 'B'),
-  line('220  CICLISMO', 'W'),
-  line('230  FORMULA UNO', 'W'),
-  line('240  TENNIS', 'W'),
-  line('250  BASKET', 'W'),
-  blank(),
-  line('I risultati di questa ricostruzione', 'C'),
-  line('sono volutamente immaginari.', 'C'),
-  ...footer('100 INDICE', '201 CALCIO')
-]));
-
-pages.set(300, () => {
-  const r = dailyRandom(300, 'meteo');
-  const cities = ['ROMA', 'MILANO', 'TORINO', 'NAPOLI', 'LUSSEMBURGO', 'MADRID'];
-  const rows = cities.map(city => line(`${city.padEnd(16)} ${String(16 + Math.floor(r() * 20)).padStart(2)}  ${String(14 + Math.floor(r() * 20)).padStart(2)}`, 'W'));
+pages.set(103, () => {
+  const r = dailyRandom(103, 'prima');
+  const first = choice(r, [
+    ['ESTATE, CITTA\' SOTTO IL SOLE', 'Parchi affollati nelle ore serali.'],
+    ['LAVORO, RIPRENDE IL CONFRONTO', 'Nuovo incontro fissato per domani.'],
+    ['TRASPORTI, PIANO PER LE VACANZE', 'Servizi rinforzati nel fine settimana.']
+  ]);
   return normalise([
-    ...heading(300, 'PREVISIONI DEL TEMPO', 'C'),
-    line('CITTA\'             MAX MIN', 'W', 'B'),
-    ...rows,
-    blank(),
-    line('NORD: sereno, nubi sui rilievi.', 'C'),
-    line('CENTRO: caldo e ventilazione debole.', 'C'),
-    line('SUD: cielo limpido, mari poco mossi.', 'C'),
-    blank(),
-    line('Previsioni simulate per atmosfera.', 'G'),
-    ...footer('100 INDICE', '301 EUROPA')
+    ...heading(103, 'PRIMA PAGINA', 'Y'),
+    line(first[0], 'Y'), line(first[1], 'W'), blank(),
+    line('PALAZZO CHIGI: RIUNIONE CONCLUSA', 'Y'),
+    line('Nessuna dichiarazione al termine.', 'W'), blank(),
+    line('SPETTACOLO: TORNA LA COMMEDIA', 'Y'),
+    line('In prima serata un film italiano.', 'W'), blank(),
+    line('SPORT: MERCATO, NUOVE TRATTATIVE', 'G'),
+    line('Le societa\' mantengono il riserbo.', 'W'),
+    ...footer('100 INDICE', '101 ULTIMA ORA')
   ]);
 });
 
+pages.set(200, () => normalise([
+  ...heading(200, 'SPORT', 'G'),
+  line('CALCIO', 'K', 'G'),
+  line('201  NOTIZIE E RISULTATI', 'W'),
+  line('205  CAMPIONATO', 'W'),
+  line('210  COPPE EUROPEE', 'W'),
+  line('215  CALCIOMERCATO', 'W'),
+  blank(),
+  line('ALTRI SPORT', 'W', 'B'),
+  line('220  CICLISMO', 'W'),
+  line('230  AUTOMOBILISMO', 'W'),
+  line('240  TENNIS', 'W'),
+  line('250  BASKET', 'W'),
+  line('260  PALLAVOLO', 'W'),
+  ...footer('100 INDICE', '201 CALCIO')
+]));
+
+pages.set(300, financePage);
+pages.set(301, exchangePage);
+
+async function financePage() {
+  const r = dailyRandom(300, 'borsa');
+  return normalise([
+    ...heading(300, 'BORSA E FINANZA', 'G'),
+    line('MILANO              ULT.     VAR.%', 'K', 'G'),
+    line(`INDICE GENERALE    ${integer(r, 950, 1290)},${integer(r,0,9)}  ${(r()-.46).toFixed(2)}`, 'W'),
+    line(`BANCARI            ${integer(r, 780, 1160)},${integer(r,0,9)}  ${(r()-.50).toFixed(2)}`, 'W'),
+    line(`INDUSTRIALI        ${integer(r, 910, 1400)},${integer(r,0,9)}  ${(r()-.47).toFixed(2)}`, 'W'),
+    blank(),
+    line('301  CAMBI E VALUTE', 'G'),
+    line('302  TITOLI DI STATO', 'G'),
+    line('303  BORSE ESTERE', 'G'),
+    line('304  ORO E METALLI', 'G'),
+    blank(),
+    line('Quotazioni indicative. Ritardo 20 min.', 'C'),
+    ...footer('100 INDICE', '301 CAMBI')
+  ]);
+}
+
+async function exchangePage() {
+  let rates = null;
+  try {
+    const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,CHF,JPY', {cache:'no-store'});
+    if (!response.ok) throw new Error('cambi non disponibili');
+    rates = (await response.json()).rates;
+  } catch (_) {}
+  const r = dailyRandom(301, 'cambi-fallback');
+  const value = code => rates?.[code] ?? ({USD:1.08+r()*.08, GBP:.82+r()*.08, CHF:.91+r()*.08, JPY:155+r()*18}[code]);
+  return normalise([
+    ...heading(301, 'CAMBI E VALUTE', 'G'),
+    line('CAMBI INDICATIVI CONTRO EURO', 'K', 'G'),
+    blank(),
+    line(`DOLLARO USA          ${value('USD').toFixed(4)}`, 'W'),
+    line(`STERLINA              ${value('GBP').toFixed(4)}`, 'W'),
+    line(`FRANCO SVIZZERO       ${value('CHF').toFixed(4)}`, 'W'),
+    line(`YEN GIAPPONESE      ${value('JPY').toFixed(2)}`, 'W'),
+    blank(),
+    line('1 EURO = 1936,27 LIRE', 'Y'),
+    line('Conversione di riferimento.', 'C'),
+    blank(),
+    line(rates ? 'DATI IN LINEA' : 'DATI DI RISERVA', rates ? 'G' : 'Y'),
+    ...footer('300 BORSA', '100 INDICE')
+  ]);
+}
+
 pages.set(400, () => normalise([
-  ...heading(400, 'PUBBLICA UTILITA\'', 'C'),
+  ...heading(400, "PUBBLICA UTILITA'", 'C'),
   line('401  NUMERI UTILI', 'W'),
-  line('410  VIABILITA\' E TRAFFICO', 'W'),
+  line("410  VIABILITA' E TRAFFICO", 'W'),
   line('420  TRENI E TRASPORTI', 'W'),
   line('430  FARMACIE DI TURNO', 'W'),
-  line('440  SCUOLA E UNIVERSITA\'', 'W'),
-  line('450  CONSUMATORI', 'W'),
-  line('460  POSTE E TELEFONI', 'W'),
+  line("440  SCUOLA E UNIVERSITA'", 'W'),
+  line('450  PREVISIONI DEL TEMPO', 'W'),
+  line('460  MARI E VENTI', 'W'),
+  line('470  POSTE E TELEFONI', 'W'),
   blank(),
-  line('AVVISO AGLI UTENTI', 'Y'),
-  line('Il servizio e\' in fase sperimentale.', 'W'),
-  line('Le pagine possono apparire lentamente.', 'W'),
-  ...footer('100 INDICE', '500 PROGRAMMI')
+  line('SERVIZIO ATTIVO 24 ORE SU 24', 'Y'),
+  line('Aggiornamenti secondo disponibilita\'.', 'C'),
+  ...footer('100 INDICE', '450 METEO')
 ]));
+
+pages.set(450, weatherPage);
+
+async function weatherPage() {
+  const cities = [
+    ['ROMA',41.90,12.50], ['MILANO',45.46,9.19], ['NAPOLI',40.85,14.27],
+    ['PALERMO',38.12,13.36], ['LUSSEMBURGO',49.61,6.13]
+  ];
+  let rows = [];
+  let online = true;
+  try {
+    const lat = cities.map(c=>c[1]).join(',');
+    const lon = cities.map(c=>c[2]).join(',');
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`;
+    const response = await fetch(url, {cache:'no-store'});
+    if (!response.ok) throw new Error('meteo non disponibile');
+    const data = await response.json();
+    const list = Array.isArray(data) ? data : [data];
+    rows = cities.map((city, i) => line(`${city[0].padEnd(13)} ${String(Math.round(list[i].current.temperature_2m)).padStart(2)}  ${String(Math.round(list[i].daily.temperature_2m_max[0])).padStart(2)} ${String(Math.round(list[i].daily.temperature_2m_min[0])).padStart(2)}`, 'W'));
+  } catch (_) {
+    online = false;
+    const r = dailyRandom(450, 'meteo-fallback');
+    rows = cities.map(city => {
+      const max = integer(r, 20, 36); const min = max - integer(r, 6, 13);
+      return line(`${city[0].padEnd(13)} ${String(integer(r,min,max)).padStart(2)}  ${String(max).padStart(2)} ${String(min).padStart(2)}`, 'W');
+    });
+  }
+  return normalise([
+    ...heading(450, 'PREVISIONI DEL TEMPO', 'C'),
+    line("CITTA'        ORA MAX MIN", 'K', 'C'),
+    ...rows,
+    blank(),
+    line('NORD: sereno, nubi sui rilievi.', 'C'),
+    line('CENTRO: caldo, venti deboli.', 'C'),
+    line('SUD: cielo poco nuvoloso.', 'C'),
+    blank(),
+    line(online ? 'DATI METEO IN LINEA' : 'BOLLETTINO DI RISERVA', online ? 'G' : 'Y'),
+    ...footer('400 SERVIZI', '460 MARI')
+  ]);
+}
 
 pages.set(500, () => normalise([
-  ...heading(500, 'PROGRAMMI TV', 'C'),
-  line('RAIUNO', 'Y'),
-  line('20.00  TELEGIORNALE', 'W'),
-  line('20.30  PREVISIONI DEL TEMPO', 'W'),
-  line('20.40  FILM: ESTATE ALLA STAZIONE', 'W'),
+  ...heading(500, 'PROGRAMMI TV E RADIO', 'C'),
+  line('501  KAIUNO', 'Y'),
+  line('502  KAIDUE', 'Y'),
+  line('503  KAITRE', 'Y'),
+  line('510  FILM DELLA SERA', 'W'),
+  line('520  PROGRAMMI DEL POMERIGGIO', 'W'),
+  line('530  PROGRAMMI DI DOMANI', 'W'),
+  line('540  RADIOUNO', 'W'),
+  line('550  RADIODUE', 'W'),
+  line('560  RADIOTRE', 'W'),
   blank(),
-  line('RAIDUE', 'Y'),
-  line('20.15  CARTONI ANIMATI', 'W'),
-  line('20.45  QUIZ DEL GIOVEDI\'', 'W'),
-  line('22.10  SPECIALE NOTTE', 'W'),
-  blank(),
-  line('RAITRE', 'Y'),
-  line('20.30  TELEGIORNALE REGIONALE', 'W'),
-  line('21.00  DOCUMENTARIO', 'W'),
-  ...footer('100 INDICE', '501 DOMANI')
+  line('ORARI SOGGETTI A VARIAZIONI', 'C'),
+  ...footer('100 INDICE', '510 FILM')
 ]));
+
+const films = [
+  ['VACANZE A PORTO CERVO','Italia 1991','con Jerry Cala\' e Marina Suma'],
+  ['IL TASSISTA DI OSTIA','Italia 1988','con Diego Abatantuono'],
+  ['UNA SETTIMANA AL MARE','Italia 1990','con Jerry Cala\' e Sabrina Salerno'],
+  ['L\'ESTATE DI RICCARDO','Italia 1989','commedia sentimentale'],
+  ['TRE CAMERE E CUCINA','Italia 1992','con Massimo Boldi']
+];
+
+function eveningFilm() { return choice(dailyRandom(510, 'film'), films); }
+
+pages.set(501, () => {
+  const film = eveningFilm();
+  return normalise([
+    ...heading(501, 'KAIUNO', 'C'),
+    line('18.45  GIOCO A PREMI', 'W'),
+    line('19.50  CHE TEMPO FA', 'W'),
+    line('20.00  TELEGIORNALE', 'Y'),
+    line('20.30  SPORT', 'W'),
+    line(`20.40  FILM: ${film[0]}`, 'W'),
+    line(`       ${film[1]}`, 'C'),
+    line('22.25  TELEGIORNALE', 'W'),
+    line('22.40  APPUNTAMENTO AL CINEMA', 'W'),
+    line('23.00  SPECIALE NOTTE', 'W'),
+    line('00.10  PREVISIONI DEL TEMPO', 'W'),
+    ...footer('500 PROGRAMMI', '510 FILM')
+  ]);
+});
+
+pages.set(502, () => normalise([
+  ...heading(502, 'KAIDUE', 'C'),
+  line('18.30  CARTONI ANIMATI', 'W'),
+  line('19.15  TELEFILM', 'W'),
+  line('20.15  TELEGIORNALE', 'Y'),
+  line('20.40  QUIZ DELLA SERA', 'W'),
+  line('21.35  SERIE: VITE IN CORSIA', 'W'),
+  line('22.30  INCONTRI', 'W'),
+  line('23.20  METEO 2', 'W'),
+  line('23.30  FILM TV', 'W'),
+  ...footer('500 PROGRAMMI', '503 KAITRE')
+]));
+
+pages.set(503, () => normalise([
+  ...heading(503, 'KAITRE', 'C'),
+  line('18.00  GEO - NATURA', 'W'),
+  line('19.00  TELEGIORNALE REGIONALE', 'Y'),
+  line('19.30  NOTIZIE NAZIONALI', 'W'),
+  line('20.05  CARTOLINA ITALIANA', 'W'),
+  line('20.30  CHI LO HA VISTO?', 'W'),
+  line('22.15  DOCUMENTARIO', 'W'),
+  line('23.20  FUORI ORARIO', 'W'),
+  line('01.10  FINE DELLE TRASMISSIONI', 'C'),
+  ...footer('500 PROGRAMMI', '501 KAIUNO')
+]));
+
+pages.set(510, () => {
+  const film = eveningFilm();
+  return normalise([
+    ...heading(510, 'FILM DELLA SERA', 'C'),
+    line('KAIUNO ORE 20.40', 'Y'),
+    blank(),
+    line(center(film[0]), 'W', 'B'),
+    blank(),
+    line(film[1], 'C'),
+    line(film[2], 'W'),
+    blank(),
+    line('Commedia. Un gruppo di amici parte', 'W'),
+    line('per una vacanza destinata a cambiare', 'W'),
+    line('continuamente programma.', 'W'),
+    blank(),
+    line('PRIMA VISIONE TELEVISIVA', 'G'),
+    ...footer('500 PROGRAMMI', '501 KAIUNO')
+  ]);
+});
 
 pages.set(600, () => normalise([
-  ...heading(600, 'GIOCHI E LOTTERIE', 'M'),
-  line('601  LOTTO - ULTIMA ESTRAZIONE', 'W'),
-  line('610  TOTOCALCIO', 'W'),
+  ...heading(600, 'GIOCHI E TEMPO LIBERO', 'M'),
+  line('610  LOTTO - ULTIMA ESTRAZIONE', 'W'),
+  line('615  TOTOCALCIO', 'W'),
   line('620  OROSCOPO', 'W'),
-  line('630  QUIZ DEL GIORNO', 'W'),
   line('640  ENIGMISTICA', 'W'),
+  line('650  PICCOLA PUBBLICITA\'', 'W'),
   blank(),
-  line('INDIZIO', 'Y'),
-  line('Una pagina fuori indice conserva una', 'C'),
-  line('chiave trovata vicino al numero 642.', 'C'),
+  line('OGGI: NUMERO FORTUNATO', 'Y'),
+  line(center(String(integer(dailyRandom(600,'numero'), 1, 90))), 'Y'),
   blank(),
-  line('Non tutte le piste portano a qualcosa.', 'G'),
-  ...footer('100 INDICE', '700 SERVIZI')
+  line('Le pagine cambiano con il nuovo giorno.', 'C'),
+  ...footer('100 INDICE', '620 OROSCOPO')
 ]));
 
+pages.set(610, () => {
+  const r = dailyRandom(610, 'lotto');
+  const draw = () => [...new Set(Array.from({length:8},()=>integer(r,1,90)))].slice(0,5).sort((a,b)=>a-b).map(n=>String(n).padStart(2,'0')).join('  ');
+  return normalise([
+    ...heading(610, 'LOTTO', 'M'),
+    line('ULTIMA ESTRAZIONE', 'K', 'M'),
+    blank(),
+    line(`BARI      ${draw()}`, 'W'),
+    line(`MILANO    ${draw()}`, 'W'),
+    line(`NAPOLI    ${draw()}`, 'W'),
+    line(`ROMA      ${draw()}`, 'W'),
+    line(`TORINO    ${draw()}`, 'W'),
+    blank(),
+    line('Estrazione ricostruita.', 'C'),
+    ...footer('600 GIOCHI', '620 OROSCOPO')
+  ]);
+});
+
+const signs = [
+  ['ARIETE','iniziativa','evitare la fretta'], ['TORO','costanza','accettare un cambiamento'],
+  ['GEMELLI','comunicazione','ascoltare con calma'], ['CANCRO','sensibilita\'','non chiudersi troppo'],
+  ['LEONE','sicurezza','lasciare spazio agli altri'], ['VERGINE','precisione','non cercare la perfezione'],
+  ['BILANCIA','armonia','decidere senza rinviare'], ['SCORPIONE','intuito','misurare le parole'],
+  ['SAGITTARIO','entusiasmo','controllare i dettagli'], ['CAPRICORNO','concretezza','concedersi una pausa'],
+  ['ACQUARIO','originalita\'','mantenere una promessa'], ['PESCI','immaginazione','proteggere le energie']
+];
+
+pages.set(620, () => normalise([
+  ...heading(620, 'OROSCOPO', 'M'),
+  line('621 ARIETE       627 BILANCIA', 'W'),
+  line('622 TORO         628 SCORPIONE', 'W'),
+  line('623 GEMELLI      629 SAGITTARIO', 'W'),
+  line('624 CANCRO       630 CAPRICORNO', 'W'),
+  line('625 LEONE        631 ACQUARIO', 'W'),
+  line('626 VERGINE      632 PESCI', 'W'),
+  blank(),
+  line('Previsioni per la giornata.', 'C'),
+  line('Un invito positivo per ogni segno.', 'C'),
+  ...footer('600 GIOCHI', '621 ARIETE')
+]));
+
+signs.forEach((sign, index) => {
+  const page = 621 + index;
+  pages.set(page, () => horoscopePage(page, sign));
+});
+
+function horoscopePage(page, [name, strength, caution]) {
+  const r = dailyRandom(page, name);
+  const openings = [
+    `La ${strength} sara' la carta migliore.`,
+    `Giornata favorevole alla ${strength}.`,
+    `La tua ${strength} trova finalmente spazio.`,
+    `Un fatto semplice premia la ${strength}.`
+  ];
+  const specifics = {
+    ARIETE:['Una telefonata sblocca un programma.','Buona energia nel pomeriggio.'],
+    TORO:['Un acquisto rimandato puo\' attendere.','In casa torna un clima sereno.'],
+    GEMELLI:['Una conversazione porta chiarezza.','Possibile incontro curioso.'],
+    CANCRO:['Una persona vicina offre sostegno.','Serata adatta ai ricordi belli.'],
+    LEONE:['Un riconoscimento arriva senza rumore.','Occasione per guidare con misura.'],
+    VERGINE:['Un dettaglio ben curato fara\' la differenza.','Ordine e metodo danno sollievo.'],
+    BILANCIA:['Un accordo diventa piu\' semplice.','Buon momento per chiarire con gentilezza.'],
+    SCORPIONE:['Un dubbio trova risposta.','L\'intuizione indica la strada giusta.'],
+    SAGITTARIO:['Una proposta riaccende l\'entusiasmo.','Piccolo viaggio o cambio di scena.'],
+    CAPRICORNO:['Un risultato concreto e\' vicino.','La pazienza produce un vantaggio.'],
+    ACQUARIO:['Una idea insolita riceve attenzione.','Amicizie in primo piano.'],
+    PESCI:['Un progetto creativo riprende vita.','Un gesto affettuoso cambia la serata.']
+  };
+  const ratings = ['★★★☆☆','★★★★☆','★★★★☆','★★★★★'];
+  return normalise([
+    ...heading(page, name, 'M'),
+    line(center(name), 'K', 'M'),
+    blank(),
+    line(choice(r, openings), 'Y'),
+    blank(),
+    line(choice(r, specifics[name]), 'W'),
+    line(`Consiglio: ${caution}.`, 'C'),
+    blank(),
+    line(`AMORE     ${choice(r, ratings)}`, 'W'),
+    line(`LAVORO    ${choice(r, ratings)}`, 'W'),
+    line(`FORTUNA   ${choice(r, ratings)}`, 'W'),
+    blank(),
+    line(`NUMERO    ${integer(r,1,90)}`, 'G'),
+    ...footer('620 OROSCOPO', '600 GIOCHI')
+  ]);
+}
+
 pages.set(700, () => normalise([
-  ...heading(700, 'SERVIZI', 'M'),
+  ...heading(700, 'SCIENZA E SERVIZI', 'M'),
   line('701  COMPUTER E VIDEOGIOCHI', 'W'),
   line('710  RADIOAMATORI', 'W'),
   line('720  MERCATINO', 'W'),
   line('730  MESSAGGI DEGLI UTENTI', 'W'),
   line('740  ARCHIVIO', 'W'),
   blank(),
-  line('777  SOTTOTITOLI / SERVIZIO SPECIALE', 'Y'),
+  line('777  SERVIZIO SPECIALE', 'Y'),
   blank(),
-  line('Alcune pagine non vengono annunciate.', 'C'),
-  line('Provare numeri liberi tra 701 e 899.', 'C'),
+  line('Alcune pagine non sono annunciate.', 'C'),
+  line('La ricezione puo\' variare nel tempo.', 'C'),
   ...footer('100 INDICE', '777 SERVIZIO')
 ]));
 
@@ -285,21 +525,24 @@ pages.set(777, () => normalise([
 ]));
 
 pages.set(800, () => normalise([
-  ...heading(800, 'OGGI', 'Y'),
+  ...heading(800, 'ALMANACCO', 'Y'),
+  line(`OGGI E' ${dateLabel()}`, 'W'),
+  blank(),
   line('801  IL GIORNO E LA STORIA', 'W'),
   line('810  RASSEGNA STAMPA', 'W'),
   line('820  SPETTACOLI', 'W'),
   line('830  APPUNTAMENTI', 'W'),
-  line('840  IL TEMPO', 'W'),
+  line('840  NATURA E AMBIENTE', 'W'),
   line('850  VIAGGI', 'W'),
   blank(),
   line('IL SERVIZIO NOTTURNO RESTA ATTIVO', 'C'),
-  line('ANCHE DOPO LA CHIUSURA DEI PROGRAMMI.', 'C'),
+  line('ANCHE DOPO LA FINE DEI PROGRAMMI.', 'C'),
   ...footer('100 INDICE', '873 SEGNALE')
 ]));
 
 pages.set(873, () => {
-  const rare = dailyRandom(873, 'segnale')() > .70;
+  const r = dailyRandom(873, 'segnale');
+  const rare = r() > .70;
   return normalise([
     ...heading(873, 'SEGNALE', 'C'),
     blank(), blank(), blank(),
@@ -314,64 +557,66 @@ pages.set(873, () => {
 
 pages.set(899, () => normalise([
   ...heading(899, 'INFORMAZIONI', 'C'),
-  line('SERVIZIO: TELEVIDEO KA', 'W'),
-  line('PERIODO ISPIRATORE: 1990-1994', 'W'),
-  line('TECNOLOGIA: HTML, CSS, JAVASCRIPT', 'W'),
-  line('FUNZIONAMENTO: COMPLETAMENTE STATICO', 'W'),
-  line('DATI PERSONALI: NESSUNO', 'W'),
+  line('KAI - SERVIZIO TELEVIDEO', 'Y'),
   blank(),
-  line('Le pagine variabili usano un seme', 'C'),
-  line('giornaliero deterministico nel browser.', 'C'),
+  line('Diffusione nazionale.', 'W'),
+  line('Trasmissione continua.', 'W'),
+  line('Aggiornamento automatico.', 'W'),
   blank(),
-  line('Questo non e\' un servizio ufficiale RAI.', 'Y'),
+  line('La disponibilita\' delle pagine puo\'', 'W'),
+  line('dipendere dalle condizioni di ricezione.', 'W'),
+  blank(),
+  line('Per tornare all\'indice: pagina 100.', 'C'),
+  blank(),
+  line('KAI TELEVIDEO - ROMA', 'G'),
   ...footer('100 INDICE')
 ]));
 
-function pageExists(pageNumber) {
-  if (pages.has(pageNumber)) return true;
-  return dailyRandom(pageNumber, 'existence')() > .82;
-}
-
 function generatedPage(pageNumber) {
-  const r = dailyRandom(pageNumber, 'content');
-  const titles = ['ARCHIVIO', 'MESSAGGI', 'SERVIZIO LOCALE', 'NOTIZIARIO', 'PAGINA DI PROVA'];
+  const r = dailyRandom(pageNumber, 'pagina-libera');
+  const titles = ['SERVIZIO LOCALE','ARCHIVIO','COMUNICAZIONI','RUBRICA','NOTIZIARIO','PAGINA REGIONALE'];
   const texts = [
-    'Il documento originale non reca una data.',
-    'La trasmissione riprendera\' regolarmente.',
-    'Conservare questo numero per una verifica.',
-    'La riga successiva risulta illeggibile.',
-    'Un duplicato e\' stato ricevuto altrove.',
-    'Nessun operatore e\' presente in redazione.'
+    'Il servizio riprendera\' regolarmente.',
+    'Ulteriori informazioni non disponibili.',
+    'La comunicazione resta valida fino a sera.',
+    'Aggiornamento previsto nelle prossime ore.',
+    'La pagina e\' trasmessa a intervalli.',
+    'Conservare il numero per successive notizie.'
   ];
   return normalise([
-    ...heading(pageNumber, choice(r, titles), choice(r, ['Y', 'C', 'G', 'M'])),
+    ...heading(pageNumber, choice(r,titles), choice(r,['Y','C','G','M'])),
     blank(),
-    line(choice(r, texts), 'W'),
+    line(choice(r,texts), 'W'),
     blank(),
-    line(choice(r, texts), 'W'),
+    line(choice(r,texts), 'W'),
     blank(),
-    line(choice(r, texts), 'W'),
-    blank(),
-    r() > .6 ? line(`RIFERIMENTO PAGINA ${100 + Math.floor(r() * 800)}`, 'Y') : blank(),
+    line(r()>.64 ? `SEGUE A PAGINA ${integer(r,100,899)}` : '', 'C'),
+    blank(), blank(),
     ...footer('100 INDICE')
   ]);
 }
 
 function missingPage(pageNumber) {
   return normalise([
-    ...heading(pageNumber, 'RICERCA PAGINA', 'W'),
+    ...heading(pageNumber, 'RICERCA', 'C'),
     blank(), blank(), blank(), blank(),
     line(center('PAGINA NON TRASMESSA'), 'Y'),
     blank(),
-    line(center('ATTENDERE O DIGITARE ALTRO NUMERO'), 'C'),
+    line(center('ATTENDERE O DIGITARE'), 'W'),
+    line(center('UN ALTRO NUMERO'), 'W'),
     blank(), blank(),
     ...footer('100 INDICE')
   ]);
 }
 
+function pageExists(pageNumber) {
+  if (pages.has(pageNumber)) return true;
+  return dailyRandom(pageNumber, 'esistenza')() > .84;
+}
+
 function remember(pageNumber) {
   if (pages.has(pageNumber)) return;
-  const key = 'ka-text-discovered';
+  const key = 'kai-televideo-scoperte';
   const previous = JSON.parse(localStorage.getItem(key) || '[]');
   if (!previous.includes(pageNumber)) {
     previous.push(pageNumber);
@@ -379,44 +624,78 @@ function remember(pageNumber) {
   }
 }
 
-function render(pageNumber) {
+async function render(pageNumber) {
   currentPage = pageNumber;
   indicator.textContent = `P${pageNumber}`;
   const factory = pages.get(pageNumber);
-  if (factory) return renderLines(factory());
-  if (pageExists(pageNumber)) {
+  if (factory) {
+    renderLines(await factory());
+  } else if (pageExists(pageNumber)) {
     remember(pageNumber);
-    return renderLines(generatedPage(pageNumber));
+    renderLines(generatedPage(pageNumber));
+  } else {
+    renderLines(missingPage(pageNumber));
   }
-  renderLines(missingPage(pageNumber));
 }
 
 async function requestPage(pageNumber) {
   if (pageNumber < MIN_PAGE || pageNumber > MAX_PAGE) return;
   const token = ++requestToken;
   indicator.textContent = `P${String(pageNumber).padStart(3, '0')}`;
-  renderLines(normalise([
-    ...heading(pageNumber, 'RICERCA', 'W'),
-    blank(), blank(), blank(), blank(), blank(),
-    line(center('ATTENDERE PREGO...'), 'Y')
-  ]));
-  const r = dailyRandom(pageNumber, 'delay');
-  await new Promise(resolve => setTimeout(resolve, 350 + Math.floor(r() * 900)));
-  if (token === requestToken) render(pageNumber);
+  renderLines([
+    ...heading(pageNumber, 'RICERCA', 'C'),
+    blank(), blank(), blank(),
+    line(center('RICERCA PAGINA...'), 'Y')
+  ]);
+  const r = dailyRandom(pageNumber, 'ritardo');
+  await new Promise(resolve => setTimeout(resolve, 230 + Math.floor(r() * 650)));
+  if (token === requestToken) await render(pageNumber);
 }
 
 function commitBuffer() {
   if (inputBuffer.length !== 3) return;
-  const number = Number(inputBuffer);
+  const page = Number(inputBuffer);
   inputBuffer = '';
-  requestPage(number);
+  requestPage(page);
+}
+
+function clickSound() {
+  if (!audioContext || !humNodes) return;
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  osc.type = 'square'; osc.frequency.value = 105;
+  gain.gain.setValueAtTime(.018, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + .035);
+  osc.connect(gain).connect(audioContext.destination);
+  osc.start(); osc.stop(audioContext.currentTime + .04);
+}
+
+function toggleHum() {
+  if (humNodes) {
+    humNodes.forEach(node => { try { node.stop?.(); } catch (_) {} try { node.disconnect?.(); } catch (_) {} });
+    humNodes = null;
+    localStorage.setItem('kai-hum','0');
+    return;
+  }
+  audioContext ??= new AudioContext();
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const filter = audioContext.createBiquadFilter();
+  osc.type = 'sawtooth'; osc.frequency.value = 50;
+  filter.type = 'lowpass'; filter.frequency.value = 160;
+  gain.gain.value = .012;
+  osc.connect(filter).connect(gain).connect(audioContext.destination);
+  osc.start();
+  humNodes = [osc, filter, gain];
+  localStorage.setItem('kai-hum','1');
 }
 
 function handleKey(event) {
   if (/^[0-9]$/.test(event.key)) {
     inputBuffer = (inputBuffer + event.key).slice(-3);
     indicator.textContent = `P${inputBuffer.padEnd(3, '–')}`;
-    if (inputBuffer.length === 3) setTimeout(commitBuffer, 120);
+    clickSound();
+    if (inputBuffer.length === 3) setTimeout(commitBuffer, 110);
     event.preventDefault();
     return;
   }
@@ -427,26 +706,27 @@ function handleKey(event) {
     case 'h': case 'H': requestPage(HOME); break;
     case 'c': case 'C':
       screen.classList.toggle('crt');
-      localStorage.setItem('ka-text-crt', screen.classList.contains('crt') ? '1' : '0');
+      localStorage.setItem('kai-crt', screen.classList.contains('crt') ? '1' : '0');
       break;
-    case 'Escape':
-      inputBuffer = '';
-      indicator.textContent = `P${currentPage}`;
-      break;
+    case 'm': case 'M': toggleHum(); break;
+    case 'Escape': inputBuffer = ''; indicator.textContent = `P${currentPage}`; break;
     default: return;
   }
+  clickSound();
   event.preventDefault();
 }
 
-function updateClock() {
-  clockNode.textContent = new Date().toLocaleTimeString('it-IT', { hour12: false });
-}
-
-serviceNode.textContent = 'TELEVIDEO';
-screen.classList.toggle('crt', localStorage.getItem('ka-text-crt') !== '0');
 document.addEventListener('keydown', handleKey);
 screen.addEventListener('click', () => screen.focus());
+serviceNode.textContent = 'KAI TELEVIDEO';
+if (localStorage.getItem('kai-crt') !== '0') screen.classList.add('crt');
+
+function updateClock() {
+  clockNode.textContent = new Date().toLocaleTimeString('it-IT', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
 setInterval(updateClock, 1000);
 updateClock();
-render(HOME);
+requestPage(HOME);
 screen.focus();
