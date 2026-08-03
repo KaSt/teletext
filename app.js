@@ -2,6 +2,7 @@ const screen = document.querySelector('#screen');
 const pageNode = document.querySelector('#page');
 const indicator = document.querySelector('#page-indicator');
 const clockNode = document.querySelector('#clock');
+const serviceNode = document.querySelector('#service');
 
 const WIDTH = 40;
 const HEIGHT = 24;
@@ -13,14 +14,38 @@ let currentPage = HOME;
 let inputBuffer = '';
 let requestToken = 0;
 
+const colours = {
+  W: '#ffffff', Y: '#ffff00', C: '#00ffff', G: '#00ff00',
+  R: '#ff0000', B: '#5080ff', M: '#ff00ff'
+};
+
+const esc = value => String(value)
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;');
+
 const pad = (text = '', width = WIDTH) => String(text).slice(0, width).padEnd(width, ' ');
 const center = (text = '', width = WIDTH) => {
   const value = String(text).slice(0, width);
   const left = Math.max(0, Math.floor((width - value.length) / 2));
   return ' '.repeat(left) + value + ' '.repeat(width - left - value.length);
 };
-const rule = (char = '━') => char.repeat(WIDTH);
-const blank = () => ' '.repeat(WIDTH);
+const line = (text = '', colour = 'W', bg = '') => ({ text: pad(text), colour, bg });
+const blank = () => line('');
+
+function normalise(lines) {
+  const result = lines.slice(0, HEIGHT);
+  while (result.length < HEIGHT) result.push(blank());
+  return result;
+}
+
+function renderLines(lines) {
+  pageNode.innerHTML = normalise(lines).map(item => {
+    const fg = colours[item.colour] || colours.W;
+    const bg = item.bg ? `background:${colours[item.bg] || item.bg};` : '';
+    return `<span style="display:block;color:${fg};${bg}">${esc(item.text)}</span>`;
+  }).join('');
+}
 
 function hashString(value) {
   let hash = 2166136261;
@@ -42,454 +67,349 @@ function mulberry32(seed) {
 
 function dailyRandom(pageNumber, salt = '') {
   const now = new Date();
-  const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-  return mulberry32(hashString(`${dateKey}:${pageNumber}:${salt}`));
+  const key = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  return mulberry32(hashString(`${key}:${pageNumber}:${salt}`));
 }
 
-function choice(random, values) {
-  return values[Math.floor(random() * values.length)];
+const choice = (random, values) => values[Math.floor(random() * values.length)];
+
+function heading(page, title, colour = 'Y') {
+  return [
+    line(`TELEVIDEO ${String(page).padStart(3, '0')} ${title}`.padEnd(WIDTH), colour),
+    line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', colour)
+  ];
 }
+
+function footer(left = '100 INDICE', right = '') {
+  return [
+    line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'B'),
+    line(`${left}${right ? right.padStart(WIDTH - left.length) : ''}`, 'C')
+  ];
+}
+
+const pages = new Map();
+
+pages.set(100, () => normalise([
+  line('      TELEVIDEO - INDICE GENERALE      ', 'Y', 'B'),
+  line('        RAI  SERVIZIO TELEVIDEO        ', 'W'),
+  line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'Y'),
+  line('101  ULTIM\'ORA', 'Y'),
+  line('102  NOTIZIE DEL GIORNO', 'W'),
+  line('103  PRIMA PAGINA', 'W'),
+  line('104  OGGI', 'W'),
+  blank(),
+  line('110  PRIMO PIANO', 'W'),
+  line('120  POLITICA', 'W'),
+  line('130  ECONOMIA', 'W'),
+  line('140  DALL\'ITALIA', 'W'),
+  line('150  DAL MONDO', 'W'),
+  line('160  CULTURA E SPETTACOLO', 'W'),
+  line('200  SPORT', 'G'),
+  line('300  BORSA E FINANZA', 'G'),
+  line('400  PUBBLICA UTILITA\'', 'C'),
+  line('500  PROGRAMMI TV E RADIO', 'C'),
+  line('600  GIOCHI - LOTTO', 'M'),
+  line('700  SERVIZI E PAGINE NASCOSTE', 'M'),
+  line('800  OGGI IN ITALIA', 'Y'),
+  line('899  INFORMAZIONI SUL SERVIZIO', 'C'),
+  line('  DIGITARE IL NUMERO DELLA PAGINA  ', 'W', 'B'),
+  line('     alcune pagine non sono in indice', 'G')
+]));
+
+pages.set(101, () => {
+  const random = dailyRandom(101, 'ultima');
+  const headlines = [
+    'CALDO: TEMPERATURE ANCORA ELEVATE',
+    'TRAFFICO INTENSO SULLE AUTOSTRADE',
+    'NUOVO ACCORDO AL TERMINE DEL VERTICE',
+    'TRENI: RITARDI CONTENUTI NELLA SERA'
+  ];
+  return normalise([
+    ...heading(101, "ULTIM'ORA", 'Y'),
+    line('ULTIM\'ORA', 'W', 'R'),
+    blank(),
+    line(choice(random, headlines), 'Y'),
+    line('Aggiornamenti nelle prossime pagine.', 'W'),
+    blank(),
+    line('Le informazioni sono simulate e create', 'C'),
+    line('localmente nel browser del visitatore.', 'C'),
+    blank(),
+    line('Questa pagina cambia nel corso dei giorni.', 'G'),
+    blank(),
+    ...footer('100 INDICE', '102 NOTIZIE')
+  ]);
+});
+
+pages.set(102, () => normalise([
+  ...heading(102, 'NOTIZIE DEL GIORNO', 'Y'),
+  line('110  PRIMO PIANO', 'W'),
+  line('120  POLITICA ITALIANA', 'W'),
+  line('130  ECONOMIA E LAVORO', 'W'),
+  line('140  CRONACHE ITALIANE', 'W'),
+  line('150  NOTIZIE DAL MONDO', 'W'),
+  line('160  CULTURA E SPETTACOLO', 'W'),
+  line('170  SOCIETA\' E CITTADINI', 'W'),
+  line('180  DOSSIER E SPECIALI', 'W'),
+  blank(),
+  line('200  SPORT', 'G'),
+  line('300  BORSA E FINANZA', 'G'),
+  ...footer('101 ULTIM\'ORA', '100 INDICE')
+]));
+
+pages.set(103, () => normalise([
+  ...heading(103, 'PRIMA PAGINA', 'Y'),
+  line('IL GRAN CALDO NON CONCEDE TREGUA', 'Y'),
+  line('Pomeriggio difficile nelle grandi citta\'.', 'W'),
+  line('Previsioni e temperature a pagina 300.', 'C'),
+  blank(),
+  line('TRASPORTI, GIORNATA SENZA EMERGENZE', 'Y'),
+  line('Qualche rallentamento nelle ore di punta.', 'W'),
+  blank(),
+  line('ARCHIVI: RITROVATA UNA VECCHIA BOBINA', 'Y'),
+  line('Conteneva immagini prive di datazione.', 'W'),
+  blank(),
+  ...footer('100 INDICE', '104 OGGI')
+]));
+
+pages.set(200, () => normalise([
+  ...heading(200, 'SPORT', 'G'),
+  line('CALCIO', 'W', 'G'),
+  line('201  NOTIZIE E RISULTATI', 'W'),
+  line('205  CAMPIONATO', 'W'),
+  line('210  COPPE EUROPEE', 'W'),
+  blank(),
+  line('ALTRI SPORT', 'W', 'B'),
+  line('220  CICLISMO', 'W'),
+  line('230  FORMULA UNO', 'W'),
+  line('240  TENNIS', 'W'),
+  line('250  BASKET', 'W'),
+  blank(),
+  line('I risultati di questa ricostruzione', 'C'),
+  line('sono volutamente immaginari.', 'C'),
+  ...footer('100 INDICE', '201 CALCIO')
+]));
+
+pages.set(300, () => {
+  const r = dailyRandom(300, 'meteo');
+  const cities = ['ROMA', 'MILANO', 'TORINO', 'NAPOLI', 'LUSSEMBURGO', 'MADRID'];
+  const rows = cities.map(city => line(`${city.padEnd(16)} ${String(16 + Math.floor(r() * 20)).padStart(2)}  ${String(14 + Math.floor(r() * 20)).padStart(2)}`, 'W'));
+  return normalise([
+    ...heading(300, 'PREVISIONI DEL TEMPO', 'C'),
+    line('CITTA\'             MAX MIN', 'W', 'B'),
+    ...rows,
+    blank(),
+    line('NORD: sereno, nubi sui rilievi.', 'C'),
+    line('CENTRO: caldo e ventilazione debole.', 'C'),
+    line('SUD: cielo limpido, mari poco mossi.', 'C'),
+    blank(),
+    line('Previsioni simulate per atmosfera.', 'G'),
+    ...footer('100 INDICE', '301 EUROPA')
+  ]);
+});
+
+pages.set(400, () => normalise([
+  ...heading(400, 'PUBBLICA UTILITA\'', 'C'),
+  line('401  NUMERI UTILI', 'W'),
+  line('410  VIABILITA\' E TRAFFICO', 'W'),
+  line('420  TRENI E TRASPORTI', 'W'),
+  line('430  FARMACIE DI TURNO', 'W'),
+  line('440  SCUOLA E UNIVERSITA\'', 'W'),
+  line('450  CONSUMATORI', 'W'),
+  line('460  POSTE E TELEFONI', 'W'),
+  blank(),
+  line('AVVISO AGLI UTENTI', 'Y'),
+  line('Il servizio e\' in fase sperimentale.', 'W'),
+  line('Le pagine possono apparire lentamente.', 'W'),
+  ...footer('100 INDICE', '500 PROGRAMMI')
+]));
+
+pages.set(500, () => normalise([
+  ...heading(500, 'PROGRAMMI TV', 'C'),
+  line('RAIUNO', 'Y'),
+  line('20.00  TELEGIORNALE', 'W'),
+  line('20.30  PREVISIONI DEL TEMPO', 'W'),
+  line('20.40  FILM: ESTATE ALLA STAZIONE', 'W'),
+  blank(),
+  line('RAIDUE', 'Y'),
+  line('20.15  CARTONI ANIMATI', 'W'),
+  line('20.45  QUIZ DEL GIOVEDI\'', 'W'),
+  line('22.10  SPECIALE NOTTE', 'W'),
+  blank(),
+  line('RAITRE', 'Y'),
+  line('20.30  TELEGIORNALE REGIONALE', 'W'),
+  line('21.00  DOCUMENTARIO', 'W'),
+  ...footer('100 INDICE', '501 DOMANI')
+]));
+
+pages.set(600, () => normalise([
+  ...heading(600, 'GIOCHI E LOTTERIE', 'M'),
+  line('601  LOTTO - ULTIMA ESTRAZIONE', 'W'),
+  line('610  TOTOCALCIO', 'W'),
+  line('620  OROSCOPO', 'W'),
+  line('630  QUIZ DEL GIORNO', 'W'),
+  line('640  ENIGMISTICA', 'W'),
+  blank(),
+  line('INDIZIO', 'Y'),
+  line('Una pagina fuori indice conserva una', 'C'),
+  line('chiave trovata vicino al numero 642.', 'C'),
+  blank(),
+  line('Non tutte le piste portano a qualcosa.', 'G'),
+  ...footer('100 INDICE', '700 SERVIZI')
+]));
+
+pages.set(700, () => normalise([
+  ...heading(700, 'SERVIZI', 'M'),
+  line('701  COMPUTER E VIDEOGIOCHI', 'W'),
+  line('710  RADIOAMATORI', 'W'),
+  line('720  MERCATINO', 'W'),
+  line('730  MESSAGGI DEGLI UTENTI', 'W'),
+  line('740  ARCHIVIO', 'W'),
+  blank(),
+  line('777  SOTTOTITOLI / SERVIZIO SPECIALE', 'Y'),
+  blank(),
+  line('Alcune pagine non vengono annunciate.', 'C'),
+  line('Provare numeri liberi tra 701 e 899.', 'C'),
+  ...footer('100 INDICE', '777 SERVIZIO')
+]));
+
+pages.set(777, () => normalise([
+  ...heading(777, 'SERVIZIO SPECIALE', 'Y'),
+  blank(), blank(),
+  line(center('PAGINA NON DESTINATA AL PUBBLICO'), 'W'),
+  blank(),
+  line(center('IL SEGNALE RICORDA IL NUMERO'), 'C'),
+  blank(),
+  line(center('PROSSIMA VERIFICA: 873'), 'Y'),
+  blank(), blank(),
+  ...footer('100 INDICE')
+]));
+
+pages.set(800, () => normalise([
+  ...heading(800, 'OGGI', 'Y'),
+  line('801  IL GIORNO E LA STORIA', 'W'),
+  line('810  RASSEGNA STAMPA', 'W'),
+  line('820  SPETTACOLI', 'W'),
+  line('830  APPUNTAMENTI', 'W'),
+  line('840  IL TEMPO', 'W'),
+  line('850  VIAGGI', 'W'),
+  blank(),
+  line('IL SERVIZIO NOTTURNO RESTA ATTIVO', 'C'),
+  line('ANCHE DOPO LA CHIUSURA DEI PROGRAMMI.', 'C'),
+  ...footer('100 INDICE', '873 SEGNALE')
+]));
+
+pages.set(873, () => {
+  const rare = dailyRandom(873, 'segnale')() > .70;
+  return normalise([
+    ...heading(873, 'SEGNALE', 'C'),
+    blank(), blank(), blank(),
+    line(center(rare ? 'BENTORNATO, KA.' : 'NESSUN SEGNALE'), rare ? 'Y' : 'W'),
+    blank(),
+    line(center(rare ? 'IL RICEVITORE E\' ANCORA CALDO' : 'ATTENDERE PREGO'), 'C'),
+    blank(), blank(),
+    line(center(rare ? '642' : ''), 'G'),
+    ...footer('100 INDICE')
+  ]);
+});
+
+pages.set(899, () => normalise([
+  ...heading(899, 'INFORMAZIONI', 'C'),
+  line('SERVIZIO: TELEVIDEO KA', 'W'),
+  line('PERIODO ISPIRATORE: 1990-1994', 'W'),
+  line('TECNOLOGIA: HTML, CSS, JAVASCRIPT', 'W'),
+  line('FUNZIONAMENTO: COMPLETAMENTE STATICO', 'W'),
+  line('DATI PERSONALI: NESSUNO', 'W'),
+  blank(),
+  line('Le pagine variabili usano un seme', 'C'),
+  line('giornaliero deterministico nel browser.', 'C'),
+  blank(),
+  line('Questo non e\' un servizio ufficiale RAI.', 'Y'),
+  ...footer('100 INDICE')
+]));
 
 function pageExists(pageNumber) {
-  if (STATIC_PAGES.has(pageNumber)) return true;
-  if ([200, 201, 300, 301, 400, 500, 600, 700, 777, 800, 873, 899].includes(pageNumber)) return true;
-  const random = dailyRandom(pageNumber, 'existence');
-  return random() > 0.78;
-}
-
-function normalise(lines) {
-  const clipped = lines.slice(0, HEIGHT).map(line => pad(line));
-  while (clipped.length < HEIGHT) clipped.push(blank());
-  return clipped.join('\n');
-}
-
-const STATIC_PAGES = new Map([
-  [100, () => normalise([
-    'KA TEXT 100            INDEX',
-    rule('═'),
-    '',
-    center('WELCOME TO KA TEXT'),
-    center('THE QUIET PART OF THE SIGNAL'),
-    '',
-    '  NEWS & INFORMATION .......... 200',
-    '  WEATHER ..................... 300',
-    '  TELEVISION .................. 400',
-    '  CLASSIFIEDS ................. 500',
-    '  GAMES & PUZZLES ............. 600',
-    '  ENGINEERING / COMPUTERS ..... 700',
-    '  NIGHT SERVICE ............... 800',
-    '',
-    '  Type any three-digit page number.',
-    '  Some pages are not listed.',
-    '',
-    rule('─'),
-    '  Today: pages may appear or vanish.',
-    '  This service remembers discoveries.',
-    '',
-    '  PAGE 101  About this service',
-    '  PAGE 199  Pages you discovered',
-    '',
-  ])],
-  [101, () => normalise([
-    'KA TEXT 101            ABOUT',
-    rule('═'),
-    '',
-    'This is a wholly static Teletext world.',
-    '',
-    'There is no server-side database and no',
-    'live generator. Daily pages are produced',
-    'in your browser from deterministic seeds.',
-    '',
-    'A page can therefore be identical for all',
-    'visitors today, yet different tomorrow.',
-    '',
-    'Nothing here requires an account.',
-    'Discoveries remain only in local storage.',
-    '',
-    'The service is inspired by afternoons spent',
-    'searching numbered pages before the web.',
-    '',
-    rule('─'),
-    '100 INDEX                   199 DISCOVERED',
-  ])],
-  [199, discoveredPage],
-  [200, newsPage],
-  [201, oddNewsPage],
-  [300, weatherPage],
-  [301, continentalWeatherPage],
-  [400, televisionPage],
-  [500, classifiedsPage],
-  [600, gamesPage],
-  [700, computerPage],
-  [777, anomalyPage],
-  [800, nightPage],
-  [873, signalPage],
-  [899, servicePage],
-]);
-
-function discoveredPage() {
-  const discovered = JSON.parse(localStorage.getItem('ka-text-discovered') || '[]');
-  const sorted = [...new Set(discovered)].sort((a, b) => a - b);
-  const lines = [
-    'KA TEXT 199       DISCOVERED PAGES',
-    rule('═'),
-    '',
-  ];
-  if (!sorted.length) {
-    lines.push('No unlisted pages discovered yet.');
-    lines.push('');
-    lines.push('Try numbers that are not in the index.');
-  } else {
-    lines.push(`You have found ${sorted.length} unlisted page${sorted.length === 1 ? '' : 's'}.`);
-    lines.push('');
-    for (let row = 0; row < 12; row += 1) {
-      const chunk = sorted.slice(row * 5, row * 5 + 5);
-      if (!chunk.length) break;
-      lines.push(chunk.map(number => String(number).padStart(3, '0')).join('    '));
-    }
-  }
-  lines.push('', rule('─'), '100 INDEX');
-  return normalise(lines);
-}
-
-function newsPage() {
-  const random = dailyRandom(200, 'news');
-  const places = ['Rome', 'Madrid', 'Luxembourg', 'Turin', 'Granada', 'Valencia'];
-  const objects = ['public clock', 'weather balloon', 'telephone box', 'tram bell', 'library card'];
-  return normalise([
-    'KA TEXT 200             NEWS',
-    rule('═'),
-    '',
-    `${choice(random, places).toUpperCase()}: AFTERNOON HEAT CONTINUES`,
-    'Officials advise shade, water and patience.',
-    '',
-    'LOCAL ARCHIVE FINDS UNLABELLED TAPE',
-    `Recording may concern a missing ${choice(random, objects)}.`,
-    '',
-    'NIGHT TRAIN ARRIVES THREE MINUTES EARLY',
-    'Passengers report no lasting consequences.',
-    '',
-    'SMALL VICTORIES',
-    'A balcony plant produced one new leaf.',
-    'A lost screw was found under a cabinet.',
-    '',
-    rule('─'),
-    '201 ODD NEWS              100 INDEX',
-  ]);
-}
-
-function oddNewsPage() {
-  const random = dailyRandom(201, 'odd');
-  const hours = 2 + Math.floor(random() * 8);
-  return normalise([
-    'KA TEXT 201         ODD NEWS',
-    rule('═'),
-    '',
-    'UNUSED CHANNEL HUMS FOR SEVERAL MINUTES',
-    `Engineers logged the sound at 0${hours}:17.`,
-    '',
-    'PIGEON REFUSES TO LEAVE BUS TERMINUS',
-    'Witnesses describe its position as official.',
-    '',
-    'TELETEXT PAGE REPORTED BEFORE BROADCAST',
-    'The page number was omitted from the report.',
-    '',
-    'NO FURTHER INFORMATION IS AVAILABLE.',
-    '',
-    rule('─'),
-    '200 NEWS                  100 INDEX',
-  ]);
-}
-
-function weatherPage() {
-  const random = dailyRandom(300, 'weather');
-  const cities = ['LUXEMBOURG', 'ROME', 'MADRID', 'FREILA', 'LONDON', 'MAASTRICHT'];
-  const lines = ['KA TEXT 300          WEATHER', rule('═'), '', 'CITY             NOW    LATER', ''];
-  for (const city of cities) {
-    const temperature = 15 + Math.floor(random() * 22);
-    const later = temperature - 3 + Math.floor(random() * 7);
-    lines.push(`${city.padEnd(16)}${String(temperature).padStart(2)}C    ${String(later).padStart(2)}C`);
-  }
-  lines.push('', 'OUTLOOK', 'Warm pixels, isolated static after dusk.', '', rule('─'), '301 EUROPE                100 INDEX');
-  return normalise(lines);
-}
-
-function continentalWeatherPage() {
-  return normalise([
-    'KA TEXT 301      EUROPEAN OUTLOOK',
-    rule('═'),
-    '',
-    'NORTH      Cloud moving east overnight.',
-    'WEST       Dry, except where it is not.',
-    'CENTRAL    Clear intervals between signals.',
-    'SOUTH      Very warm. Shutters recommended.',
-    '',
-    'SEA STATE  Moderately blue.',
-    '',
-    'Long-range forecast confidence: decorative.',
-    '',
-    rule('─'),
-    '300 WEATHER               100 INDEX',
-  ]);
-}
-
-function televisionPage() {
-  const random = dailyRandom(400, 'tv');
-  const films = ['THE LAST SATELLITE', 'SUMMER AT PLATFORM 4', 'A ROOM WITH NO NUMBER', 'THE BLUE CARTRIDGE'];
-  return normalise([
-    'KA TEXT 400       TELEVISION TONIGHT',
-    rule('═'),
-    '',
-    '20:00  NEWS WITHOUT URGENCY',
-    '20:25  WEATHER MAP AND SYNTH MUSIC',
-    `20:35  FILM: ${choice(random, films)}`,
-    '22:12  CLOSEDOWN ANNOUNCEMENT',
-    '22:15  TEST CARD / MUSIC',
-    '',
-    'CHANNEL 2',
-    '20:10  REPEAT OF SOMETHING FAMILIAR',
-    '21:00  PHONE-IN: IS THE SIGNAL BETTER?',
-    '',
-    rule('─'),
-    '100 INDEX',
-  ]);
-}
-
-function classifiedsPage() {
-  const random = dailyRandom(500, 'ads');
-  const prices = [25, 40, 75, 120, 399];
-  return normalise([
-    'KA TEXT 500          CLASSIFIEDS',
-    rule('═'),
-    '',
-    'FOR SALE: 14-INCH COLOUR TELEVISION',
-    `Remote missing. Picture honest. ${choice(random, prices)} EUR`,
-    '',
-    'WANTED: INSTRUCTION BOOK FOR OLD MODEM',
-    'Will exchange two blank cassettes.',
-    '',
-    'COMPUTER REPAIRS WHILE YOU WAIT',
-    'Waiting time depends on computer.',
-    '',
-    'FOUND: SMALL BRASS KEY NEAR PAGE 642',
-    'Describe the lock to claim.',
-    '',
-    rule('─'),
-    '100 INDEX',
-  ]);
-}
-
-function gamesPage() {
-  const random = dailyRandom(600, 'game');
-  const a = 10 + Math.floor(random() * 80);
-  const b = 10 + Math.floor(random() * 80);
-  return normalise([
-    'KA TEXT 600        GAMES & PUZZLES',
-    rule('═'),
-    '',
-    'TODAY\'S THREE-NUMBER TRAIL',
-    '',
-    `Start with ${a}. Add ${b}. Reverse the result.`,
-    'The first three digits are a page number.',
-    '',
-    'Some trails lead nowhere.',
-    'That does not mean they were wrong.',
-    '',
-    'QUICK QUIZ',
-    'Which came first: the page or its number?',
-    '',
-    rule('─'),
-    '100 INDEX',
-  ]);
-}
-
-function computerPage() {
-  return normalise([
-    'KA TEXT 700     COMPUTERS / ENGINEERING',
-    rule('═'),
-    '',
-    'HOME MICRO TIP',
-    'Save twice before trusting a thirty-year-old',
-    'battery, and verify the second copy.',
-    '',
-    'SOFTWARE',
-    'A new browser claims to index everything.',
-    'This service has declined to participate.',
-    '',
-    'SIGNAL DIAGNOSTICS',
-    'Carrier stable. Pages mostly accounted for.',
-    'Unassigned memory: 17 percent.',
-    '',
-    rule('─'),
-    '777 DIAGNOSTIC?           100 INDEX',
-  ]);
-}
-
-function anomalyPage() {
-  const random = dailyRandom(777, 'anomaly');
-  const messages = [
-    'THE SIGNAL REMEMBERS THE LAST NUMBER.',
-    'THIS PAGE WAS NOT IN YESTERDAY\'S INDEX.',
-    'SOMEONE LEFT THE SERVICE RUNNING.',
-    'DO NOT ADJUST THE SET.',
-  ];
-  return normalise([
-    'KA TEXT 777       UNASSIGNED SERVICE',
-    rule('═'),
-    '', '',
-    center(choice(random, messages)),
-    '',
-    center('NEXT CHECK: 873'),
-    '', '',
-    center('...'),
-    '',
-    rule('─'),
-    '100 INDEX',
-  ]);
-}
-
-function nightPage() {
-  const hour = new Date().getHours();
-  return normalise([
-    'KA TEXT 800        NIGHT SERVICE',
-    rule('═'),
-    '',
-    hour >= 22 || hour < 6 ? center('YOU ARE HERE AT THE RIGHT TIME') : center('RETURN AFTER CLOSEDOWN'),
-    '',
-    'Low-volume pages continue after midnight.',
-    'Not every transmission appears in the index.',
-    '',
-    'If the room is quiet, page 873 may answer.',
-    '',
-    rule('─'),
-    '100 INDEX',
-  ]);
-}
-
-function signalPage() {
-  const random = dailyRandom(873, 'signal');
-  const rare = random() > 0.72;
-  return normalise([
-    'KA TEXT 873            SIGNAL',
-    rule('═'),
-    '', '', '',
-    center(rare ? 'WELCOME BACK, KA.' : 'NO SIGNAL'),
-    '',
-    center(rare ? 'THE RECEIVER IS STILL WARM.' : 'PLEASE WAIT'),
-    '', '', '',
-    rare ? center('642') : blank(),
-    '',
-    rule('─'),
-    '100 INDEX',
-  ]);
-}
-
-function servicePage() {
-  return normalise([
-    'KA TEXT 899       SERVICE INFORMATION',
-    rule('═'),
-    '',
-    'SERVICE: KA TEXT',
-    'DELIVERY: STATIC HTML / CSS / JAVASCRIPT',
-    'STORAGE: LOCAL BROWSER ONLY',
-    'GENERATION: DAILY DETERMINISTIC SEEDS',
-    '',
-    'NO COOKIES. NO ACCOUNT. NO TRACKING CODE.',
-    '',
-    'If this page is visible, the service is up.',
-    '',
-    rule('─'),
-    '100 INDEX',
-  ]);
+  if (pages.has(pageNumber)) return true;
+  return dailyRandom(pageNumber, 'existence')() > .82;
 }
 
 function generatedPage(pageNumber) {
-  const random = dailyRandom(pageNumber, 'content');
-  const headings = ['ARCHIVE', 'LOCAL SERVICE', 'ENGINEERING', 'COMMUNITY', 'LATE BULLETIN', 'UNFILED'];
-  const fragments = [
-    'A message was received without a timestamp.',
-    'The office will reopen when the fan stops.',
-    'One line of the original record is missing.',
-    'Please retain this number for future use.',
-    'The item described is no longer manufactured.',
-    'No operator is currently assigned.',
-    'A duplicate page was observed in another town.',
-    'This notice expires at an unspecified time.',
+  const r = dailyRandom(pageNumber, 'content');
+  const titles = ['ARCHIVIO', 'MESSAGGI', 'SERVIZIO LOCALE', 'NOTIZIARIO', 'PAGINA DI PROVA'];
+  const texts = [
+    'Il documento originale non reca una data.',
+    'La trasmissione riprendera\' regolarmente.',
+    'Conservare questo numero per una verifica.',
+    'La riga successiva risulta illeggibile.',
+    'Un duplicato e\' stato ricevuto altrove.',
+    'Nessun operatore e\' presente in redazione.'
   ];
   return normalise([
-    `KA TEXT ${pageNumber} ${choice(random, headings).padStart(24)}`,
-    rule('═'),
-    '',
-    choice(random, fragments),
-    '',
-    choice(random, fragments),
-    '',
-    choice(random, fragments),
-    '',
-    random() > 0.62 ? `REFERENCE: ${100 + Math.floor(random() * 800)}` : '',
-    '',
-    rule('─'),
-    '100 INDEX',
+    ...heading(pageNumber, choice(r, titles), choice(r, ['Y', 'C', 'G', 'M'])),
+    blank(),
+    line(choice(r, texts), 'W'),
+    blank(),
+    line(choice(r, texts), 'W'),
+    blank(),
+    line(choice(r, texts), 'W'),
+    blank(),
+    r() > .6 ? line(`RIFERIMENTO PAGINA ${100 + Math.floor(r() * 800)}`, 'Y') : blank(),
+    ...footer('100 INDICE')
   ]);
 }
 
 function missingPage(pageNumber) {
   return normalise([
-    `KA TEXT ${pageNumber}          SEARCHING`,
-    rule('═'),
-    '', '', '', '', '',
-    center('PAGE NOT RECEIVED'),
-    '',
-    center('PLEASE TRY ANOTHER NUMBER'),
-    '', '', '', '',
-    rule('─'),
-    '100 INDEX',
+    ...heading(pageNumber, 'RICERCA PAGINA', 'W'),
+    blank(), blank(), blank(), blank(),
+    line(center('PAGINA NON TRASMESSA'), 'Y'),
+    blank(),
+    line(center('ATTENDERE O DIGITARE ALTRO NUMERO'), 'C'),
+    blank(), blank(),
+    ...footer('100 INDICE')
   ]);
 }
 
 function remember(pageNumber) {
-  if (STATIC_PAGES.has(pageNumber)) return;
-  const previous = JSON.parse(localStorage.getItem('ka-text-discovered') || '[]');
+  if (pages.has(pageNumber)) return;
+  const key = 'ka-text-discovered';
+  const previous = JSON.parse(localStorage.getItem(key) || '[]');
   if (!previous.includes(pageNumber)) {
     previous.push(pageNumber);
-    localStorage.setItem('ka-text-discovered', JSON.stringify(previous));
+    localStorage.setItem(key, JSON.stringify(previous));
   }
 }
 
 function render(pageNumber) {
   currentPage = pageNumber;
   indicator.textContent = `P${pageNumber}`;
-  const factory = STATIC_PAGES.get(pageNumber);
-  if (factory) {
-    pageNode.textContent = factory();
-    return;
-  }
+  const factory = pages.get(pageNumber);
+  if (factory) return renderLines(factory());
   if (pageExists(pageNumber)) {
     remember(pageNumber);
-    pageNode.textContent = generatedPage(pageNumber);
-  } else {
-    pageNode.textContent = missingPage(pageNumber);
+    return renderLines(generatedPage(pageNumber));
   }
+  renderLines(missingPage(pageNumber));
 }
 
 async function requestPage(pageNumber) {
   if (pageNumber < MIN_PAGE || pageNumber > MAX_PAGE) return;
   const token = ++requestToken;
   indicator.textContent = `P${String(pageNumber).padStart(3, '0')}`;
-  pageNode.textContent = normalise([
-    `KA TEXT ${pageNumber}          SEARCHING`,
-    rule('═'), '', '', '', '', '', '', center('SEARCHING...')
-  ]);
-  const random = dailyRandom(pageNumber, 'delay');
-  await new Promise(resolve => setTimeout(resolve, 260 + Math.floor(random() * 700)));
+  renderLines(normalise([
+    ...heading(pageNumber, 'RICERCA', 'W'),
+    blank(), blank(), blank(), blank(), blank(),
+    line(center('ATTENDERE PREGO...'), 'Y')
+  ]));
+  const r = dailyRandom(pageNumber, 'delay');
+  await new Promise(resolve => setTimeout(resolve, 350 + Math.floor(r() * 900)));
   if (token === requestToken) render(pageNumber);
 }
 
 function commitBuffer() {
   if (inputBuffer.length !== 3) return;
-  const pageNumber = Number(inputBuffer);
+  const number = Number(inputBuffer);
   inputBuffer = '';
-  requestPage(pageNumber);
+  requestPage(number);
 }
 
 function handleKey(event) {
@@ -500,7 +420,6 @@ function handleKey(event) {
     event.preventDefault();
     return;
   }
-
   switch (event.key) {
     case 'Enter': commitBuffer(); break;
     case 'ArrowLeft': requestPage(Math.max(MIN_PAGE, currentPage - 1)); break;
@@ -520,14 +439,13 @@ function handleKey(event) {
 }
 
 function updateClock() {
-  clockNode.textContent = new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }).format(new Date());
+  clockNode.textContent = new Date().toLocaleTimeString('it-IT', { hour12: false });
 }
 
-window.addEventListener('keydown', handleKey);
-screen.addEventListener('pointerdown', () => screen.focus());
+serviceNode.textContent = 'TELEVIDEO';
 screen.classList.toggle('crt', localStorage.getItem('ka-text-crt') !== '0');
+document.addEventListener('keydown', handleKey);
+screen.addEventListener('click', () => screen.focus());
 setInterval(updateClock, 1000);
 updateClock();
 render(HOME);
